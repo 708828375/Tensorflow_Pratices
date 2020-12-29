@@ -7,7 +7,4 @@
 
 - JupyterNotebook Projects文件夹中存放了所有用JupyterNotebook写的小项目
 
-- Pycharm Projects文件夹中存放了使用pycharm做的项目
-
-  
-
+- ML_Pycharm文件夹中存放了使用pycharm做的项目
