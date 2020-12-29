@@ -33,7 +33,7 @@ def show(img_path, annotation_path):
 def data_process():
     """
     处理数据，创建训练数据集和测试数据集
-    :return: 训练数据集和测试数据集
+    :return: 训练数据集、测试数据集、STEPS_PER_EPOCH、VALIDATION_STEPS
     """
     # 获取所有图片的存储地址
     images = glob.glob("F:\\dataset\\图片定位与分割\\images\\*.jpg")
@@ -67,7 +67,7 @@ def data_process():
     train_ds = train_ds.cache().shuffle(BUFFER_SIZE).batch(BATCH_SIZE).repeat()
     train_ds = train_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
     test_ds = test_ds.batch(BATCH_SIZE)
-    return train_ds, test_ds
+    return train_ds, test_ds, STEPS_PER_EPOCH, VALIDATION_STEPS
 
 
 def read_jpg(path):
@@ -123,7 +123,7 @@ def load_image(input_image_path, input_mask_path):
 def create_model():
     """
     创建训练模型
-    :return:
+    :return:创建好的模型
     """
     # 使用预训练网络VGG16
     conv_base = tf.keras.applications.VGG16(weights='imagenet', input_shape=(224, 224, 3), include_top=False)
@@ -146,11 +146,72 @@ def create_model():
     # 将VGG16的最后一个pool层进行反卷积
     x1 = tf.keras.layers.Conv2DTranspose(512, 3, padding='same', strides=2, activation='relu')(out_pool)  # 14*14
     # 使用一层卷积进行特征提取
-    x1 = tf.keras.layers.Conv2D(512, 3, padding='same', activation='relu')(x1)
-    
+    x1 = tf.keras.layers.Conv2D(512, 3, padding='same', activation='relu')(x1)  # 14*14
+    # 将进行特征提取后的卷积层与block5_conv3相加
+    c1 = tf.add(x1, out_block5)
+    # 将相加所得的结果进行反卷积
+    x2 = tf.keras.layers.Conv2DTranspose(512, 3, padding='same', strides=2, activation='relu')(c1)  # 28*28
+    # 特征提取
+    x2 = tf.keras.layers.Conv2D(512, 3, padding='same', activation='relu')(x2)  # 28*28
+    # 将进行特征提取后的卷积层与block4_conv3相加
+    c2 = tf.add(x2, out_block4)
+    # 将相加所得的结果进行反卷积
+    x3 = tf.keras.layers.Conv2DTranspose(256, 3, padding='same', strides=2, activation='relu')(c2)  # 56*56
+    # 特征提取
+    x3 = tf.keras.layers.Conv2D(256, 3, padding='same', activation='relu')(x3)  # 56*56
+    # 将进行特征提取后的卷积层与block3_conv3相加
+    c3 = tf.add(x3, out_block3)
+    x4 = tf.keras.layers.Conv2DTranspose(128, 3, padding='same', strides=2, activation='relu')(c3)  # 112*112
+    x4 = tf.keras.layers.Conv2D(128, 3, padding='same', activation='relu')(x4)  # 112*112
+    # 预测输出层
+    predictions = tf.keras.layers.Conv2DTranspose(3, 3, padding='same', strides=2, activation='softmax')(x4)  # 224*224
+    # 建立模型
+    model = tf.keras.models.Model(inputs=inputs, outputs=predictions)
+    return model
+
+
+def train(model, train_ds, test_ds, epochs, STEPS_PER_EPOCH, VALIDATION_STEPS):
+    """
+    模型训练
+    :param model: 模型
+    :param train_ds: 训练数据集
+    :param test_ds: 验证数据集
+    :param epochs:
+    :param STEPS_PER_EPOCH:
+    :param VALIDATION_STEPS:
+    :return: 训练结果
+    """
+    # 模型配置编译
+    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    # 模型训练
+    history = model.fit(train_ds, epochs=epochs, steps_per_epoch=STEPS_PER_EPOCH, validation_data=test_ds,
+                        validation_steps=VALIDATION_STEPS)
+    return history
+
+
+def show_history(history):
+    """
+    绘制训练结果loss
+    :param history: 训练结果
+    """
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+    epochs = range(EPOCHS)
+    plt.figure()
+    plt.plot(epochs, loss, 'r', label='Training loss')
+    plt.plot(epochs, val_loss, 'bo', label='Validation loss')
+    plt.title('Training and Validation Loss')
+    plt.Xlabel('Epoch')
+    plt.Ylabel('Loss Value')
+    plt.Ylim([0, 1])
+    plt.legend()
+    plt.show()
 
 
 if __name__ == '__main__':
     # show()
-    # data_process()
-    create_model()
+    train_ds, test_ds, STEPS_PER_EPOCH, VALIDATION_STEPS = data_process()
+    model = create_model()
+    EPOCHS = 20
+    history = train(model, train_ds, test_ds, EPOCHS, STEPS_PER_EPOCH, VALIDATION_STEPS)
+    show_history(history)
