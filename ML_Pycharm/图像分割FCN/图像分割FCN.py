@@ -7,6 +7,7 @@ import tensorflow as tf
 import glob
 import matplotlib.pyplot as plt
 import numpy as np
+from tensorflow.python.keras.callbacks import CSVLogger
 
 
 def show(img_path, annotation_path):
@@ -127,7 +128,7 @@ def create_model():
     """
     # 使用预训练网络VGG16
     conv_base = tf.keras.applications.VGG16(weights='imagenet', input_shape=(224, 224, 3), include_top=False)
-    print(conv_base.summary())
+    # print(conv_base.summary())
     # 创建一个元组记录要提取的网络层名
     layer_names = ['block5_conv3',  # 14*14
                    'block4_conv3',  # 28*28
@@ -167,6 +168,7 @@ def create_model():
     predictions = tf.keras.layers.Conv2DTranspose(3, 3, padding='same', strides=2, activation='softmax')(x4)  # 224*224
     # 建立模型
     model = tf.keras.models.Model(inputs=inputs, outputs=predictions)
+    print(model.summary())
     return model
 
 
@@ -183,9 +185,13 @@ def train(model, train_ds, test_ds, epochs, STEPS_PER_EPOCH, VALIDATION_STEPS):
     """
     # 模型配置编译
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    #  保存训练结果
+    loggger = CSVLogger('FCN_training.log', append=False)
     # 模型训练
     history = model.fit(train_ds, epochs=epochs, steps_per_epoch=STEPS_PER_EPOCH, validation_data=test_ds,
                         validation_steps=VALIDATION_STEPS)
+    #  保存模型
+    model.save('FCN_model.h5')
     return history
 
 
@@ -201,10 +207,23 @@ def show_history(history):
     plt.plot(epochs, loss, 'r', label='Training loss')
     plt.plot(epochs, val_loss, 'bo', label='Validation loss')
     plt.title('Training and Validation Loss')
-    plt.Xlabel('Epoch')
-    plt.Ylabel('Loss Value')
-    plt.Ylim([0, 1])
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss Value')
     plt.legend()
+    plt.savefig('training_loss.png')
+    plt.show()
+
+    acc = history.history['accuracy']
+    val_acc = history.history['val_accuracy']
+    epochs = range(EPOCHS)
+    plt.figure()
+    plt.plot(epochs, acc, 'r', label='Training acc')
+    plt.plot(epochs, val_acc, 'bo', label='Validation acc')
+    plt.title('Training and Validation acc')
+    plt.xlabel('Epoch')
+    plt.ylabel('Acc Value')
+    plt.legend()
+    plt.savefig('training_acc.png')
     plt.show()
 
 
@@ -212,6 +231,6 @@ if __name__ == '__main__':
     # show()
     train_ds, test_ds, STEPS_PER_EPOCH, VALIDATION_STEPS = data_process()
     model = create_model()
-    EPOCHS = 20
+    EPOCHS = 1  # 4==>acc:0.9107  val_acc:0.9039
     history = train(model, train_ds, test_ds, EPOCHS, STEPS_PER_EPOCH, VALIDATION_STEPS)
     show_history(history)
