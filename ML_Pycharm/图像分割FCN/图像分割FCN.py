@@ -231,6 +231,6 @@ if __name__ == '__main__':
     # show()
     train_ds, test_ds, STEPS_PER_EPOCH, VALIDATION_STEPS = data_process()
     model = create_model()
-    EPOCHS = 1  # 4==>acc:0.9107  val_acc:0.9039
+    EPOCHS = 20  # 4==>acc:0.9107  val_acc:0.9039
     history = train(model, train_ds, test_ds, EPOCHS, STEPS_PER_EPOCH, VALIDATION_STEPS)
     show_history(history)
